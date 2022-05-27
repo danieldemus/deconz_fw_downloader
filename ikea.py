@@ -1,43 +1,26 @@
-#!/usr/bin/env python
-"""
-Snipped to download current IKEA ZLL OTA files into ~/otau
-compatible with python 3.
-"""
-
-import os
+#!/usr/bin/env python3
 import json
-try:
-	from urllib.request import urlopen, urlretrieve
-except ImportError:
-	from urllib2 import urlopen
-	from urllib import urlretrieve
+from urllib.request import urlopen
 
+from downloader import Downloader
 
-f = urlopen("http://fw.ota.homesmart.ikea.net/feed/version_info.json")
-data = f.read()
+class Ikea(Downloader):
 
-arr = json.loads(data)
-"""
-otapath = '%s/otau' % os.path.expanduser('~')
-"""
-otapath = '/otau'
+    def getUrlList(self):
+                
+        f = urlopen("http://fw.ota.homesmart.ikea.net/feed/version_info.json")
+        data = f.read()
 
-if not os.path.exists(otapath):
-	os.makedirs(otapath)
+        arr = json.loads(data)
+        res = []
+        for i in arr:
+            if 'fw_binary_url' in i:
+                url = i['fw_binary_url']
+                ls = url.split('/')
+                fname = ls[len(ls) - 1]
 
-for i in arr:
-	if 'fw_binary_url' in i:
-		url = i['fw_binary_url']
-		ls = url.split('/')
-		fname = ls[len(ls) - 1]
-		path = '%s/%s' % (otapath, fname)
+                res.append((url, fname))
 
-		if not os.path.isfile(path):
-			urlretrieve(url, path)
-			print(path)
-		else:
-		    print('%s already exists' % fname)
-
-
+        return res
 
 
