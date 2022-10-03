@@ -6,7 +6,7 @@ from downloader import Downloader
 
 class Ikea(Downloader):
 
-    def getUrlList(self):
+    def get_url_list(self):
                 
         f = urlopen("http://fw.ota.homesmart.ikea.net/feed/version_info.json")
         data = f.read()
@@ -22,5 +22,3 @@ class Ikea(Downloader):
                 res.append((url, fname))
 
         return res
-
-

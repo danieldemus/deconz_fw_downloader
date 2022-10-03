@@ -7,7 +7,7 @@ from downloader import Downloader
 
 class Danfoss(Downloader):
 
-    def getUrlList(self):
+    def get_url_list(self):
         res = []
         page = parse(urlopen('https://files.danfoss.com/download/Heating/Ally/')).getroot()
         page.make_links_absolute('https://files.danfoss.com/download/Heating/Ally/')
@@ -16,4 +16,3 @@ class Danfoss(Downloader):
                 res.append((link.get('href'), link.text_content()))
 
         return res
-

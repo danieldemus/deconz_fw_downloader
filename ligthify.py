@@ -5,7 +5,7 @@ from downloader import Downloader
 
 class Lightify(Downloader):
 
-    def getUrlList(self):
+    def get_url_list(self):
         response = requests.get("https://api.update.ledvance.com/v1/zigbee/products")
         if 'Retry-After' in response.headers:
             defer = int(response.headers['Retry-After']) + 1

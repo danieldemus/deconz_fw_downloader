@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 import os, requests, re, time
@@ -9,28 +9,28 @@ import shutil
 class Downloader(ABC):
 
     extensions = ('.ota', '.ota.signed', '.zigbee', '.fw2', '.sbl-ota')
-    
-    def __init__(self):
-        self.otauPath = os.path.expanduser('~/otau')
+    archive_extensions = [ ext for sublist in [ x[1] for x in shutil.get_unpack_formats() ] for ext in sublist ]
+    otau_path = os.path.join(os.path.expanduser('~/otau/'))
+    log_path = os.path.join(otau_path, 'log.log')
 
     @abstractmethod
-    def getUrlList(self):
+    def get_url_list(self):
         pass
 
-    def performDownloads(self):
+    def perform_downloads(self):
         print("")
-        print(f"Putting {self.__class__.__name__} updates in {self.otauPath}")
-        if not os.path.exists(self.otauPath):
-            os.makedirs(self.otauPath)
+        print(f"Putting {self.__class__.__name__} updates in {self.otau_path}")
+        if not os.path.exists(self.otau_path):
+            os.makedirs(self.otau_path)
 
         cnt = 0
-        retries = self.getUrlList()
+        retries = self.get_url_list()
         delay = None
         while cnt == 0 or (cnt < 50 and delay):
-            retries, delay = self.handleDownloads(retries, delay)
+            retries, delay = self.handle_downloads(retries, delay)
             cnt += 1
 
-    def handleDownloads(self, lst, delay):
+    def handle_downloads(self, lst, delay):
         retries = []
 
         if delay:
@@ -48,18 +48,18 @@ class Downloader(ABC):
         newDelay = None
 
         for (url, filename) in lst:
-            ret = self.downloadFile(url, filename, retries)
+            ret = self.download_file(url, filename, retries)
             if ret is None or isinstance(ret, datetime):
                 if ret is not None or newDelay is None or ret > newDelay:
                     newDelay = ret
                 continue
 
             fname, firmwarecontent = ret
-            self.handleContent(fname, firmwarecontent)
+            self.handle_content(fname, firmwarecontent, url)
         return retries, newDelay
 
-    def downloadFile(self, url, filename, retries):
-        if filename and os.path.isfile(os.path.join(self.otauPath, filename)):
+    def download_file(self, url, filename, retries):
+        if filename and os.path.isfile(os.path.join(self.otau_path, filename)):
             print(f"{filename} skipped. A file with that name already exists")
             return None
 
@@ -78,17 +78,19 @@ class Downloader(ABC):
             contentDisposition = contentDisposition.split(";")
             fname = contentDisposition[0]
 
+        
         return fname, response.content
 
-    def handleContent(self, fname, firmwarecontent):
-        if fname.endswith(self.extensions):
-            fullname = os.path.join(self.otauPath, fname)
+    def handle_content(self, fname: str, firmwarecontent, src: str):
+        if fname.lower().endswith(self.extensions):
+            fullname = os.path.join(self.otau_path, fname)
 
             if not os.path.isfile(fullname):
                 file = open(fullname, "wb")
                 file.write(firmwarecontent)
                 file.close()
                 print(f"{fname} downloaded")
+                self.write_log(src, fname, len(firmwarecontent))
             else:
                 print(f"{fname} skipped. A file with that name already exists")
         else:
@@ -99,18 +101,26 @@ class Downloader(ABC):
                     file = open(fullname, 'wb')
                     file.write(firmwarecontent)
                     file.close()
-                    
-                shutil.unpack_archive(fullname, tmpdirname)
-                print(f"Downloaded and unpacked {fname}")
-                for f in self.filteredFilelist(tmpdirname):
-                    target = os.path.join(self.otauPath, os.path.basename(f))
-                    if not os.path.isfile(target):
-                        shutil.copyfile(f, target)
-                        print('Extracted %s' % os.path.basename(f))
-                    else:
-                        print('%s skipped. A file with that name already exists' % os.path.basename(f))
+                if list(filter(lambda ext: fname.endswith(ext), self.archive_extensions)):
+                    shutil.unpack_archive(fullname, tmpdirname)
+                    print(f"Downloaded and unpacked {fname}")
+                    for f in self.filtered_filelist(tmpdirname):
+                        target = os.path.join(self.otau_path, os.path.basename(f))
+                        if not os.path.isfile(target):
+                            shutil.copyfile(f, target)
+                            print(f"Extracted {os.path.basename(f)}")
+                            self.write_log(fname, os.path.basename(f), os.path.getsize(f))
+                        else:
+                            print('%s skipped. A file with that name already exists' % os.path.basename(f))
+                else:
+                    print(f"{fname} is not a supported file type")
 
-    def filteredFilelist(self, rootDir):
+    def filtered_filelist(self, rootDir):
         return [os.path.join(r, fn)
                 for r, ds, fs in os.walk(rootDir)
                 for fn in fs if fn.endswith(self.extensions)]
+
+    def write_log(self, src, fname, size):
+        o = open(self.log_path, "at")
+        o.write(src.ljust(100) + fname.ljust(50) + str(size).ljust(16))
+        o.close()
