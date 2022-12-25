@@ -13,6 +13,9 @@ class Downloader(ABC):
     otau_path = os.path.join(os.path.expanduser('~/otau/'))
     log_path = os.path.join(otau_path, 'log.log')
 
+    def __init__(self, verbose):
+       self.verbose = verbose
+
     @abstractmethod
     def get_url_list(self):
         pass
@@ -37,7 +40,8 @@ class Downloader(ABC):
             nowish = datetime.now(timezone.utc) + timedelta(seconds=-2)
             if delay > nowish:
                 wait = (delay - nowish).seconds + 1
-                print(f"Some downloads were deferred by the server. Waiting {wait} seconds until retry", end='', flush=True)
+                if self.verbose:
+                    print(f"Some downloads were deferred by the server. Waiting {wait} seconds until retry", end='', flush=True)
                 ix = 0
                 while ix < wait:
                     print('.', end='', flush=True)
@@ -60,7 +64,8 @@ class Downloader(ABC):
 
     def download_file(self, url, filename, retries):
         if filename and os.path.isfile(os.path.join(self.otau_path, filename)):
-            print(f"{filename} skipped. A file with that name already exists")
+            if self.verbose:
+                print(f"{filename} skipped. A file with that name already exists")
             return None
 
         response = requests.get(url)
@@ -92,7 +97,8 @@ class Downloader(ABC):
                 print(f"{fname} downloaded")
                 self.write_log(src, fname, len(firmwarecontent))
             else:
-                print(f"{fname} skipped. A file with that name already exists")
+                if self.verbose:
+                    print(f"{fname} skipped. A file with that name already exists")
         else:
             with tempfile.TemporaryDirectory() as tmpdirname:
                 fullname = os.path.join(tmpdirname, fname)
@@ -103,15 +109,18 @@ class Downloader(ABC):
                     file.close()
                 if list(filter(lambda ext: fname.endswith(ext), self.archive_extensions)):
                     shutil.unpack_archive(fullname, tmpdirname)
-                    print(f"Downloaded and unpacked {fname}")
+                    if self.verbose:
+                        print(f"Downloaded and unpacked {fname}")
                     for f in self.filtered_filelist(tmpdirname):
                         target = os.path.join(self.otau_path, os.path.basename(f))
                         if not os.path.isfile(target):
                             shutil.copyfile(f, target)
-                            print(f"Extracted {os.path.basename(f)}")
+                            if self.verbose:
+                                print(f"Extracted {os.path.basename(f)}")
                             self.write_log(fname, os.path.basename(f), os.path.getsize(f))
                         else:
-                            print('%s skipped. A file with that name already exists' % os.path.basename(f))
+                            if self.verbose:
+                                print('%s skipped. A file with that name already exists' % os.path.basename(f))
                 else:
                     print(f"{fname} is not a supported file type")
 
