@@ -130,6 +130,5 @@ class Downloader(ABC):
                 for fn in fs if fn.endswith(self.extensions)]
 
     def write_log(self, src, fname, size):
-        o = open(self.log_path, "at")
-        o.write(src.ljust(100) + fname.ljust(50) + str(size).ljust(16))
-        o.close()
+        with open(self.log_path, "at") as o:
+            o.write(src.ljust(100) + fname.ljust(50) + str(size).ljust(16) + '\n')
